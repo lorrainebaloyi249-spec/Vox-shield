@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>VoxShield — Voice Protection</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #00d4ff;
+    --pink: #ff006e;
+    --green: #00ff9f;
+    --purple: #9d00ff;
+    --cyan: #00ffff;
+    --yellow: #ffff00;
+    --bg: #020008;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    color: white;
+    user-select: none;
+  }
+
+  /* === ANIMATED BACKGROUND === */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+  }
+
+  /* === MAIN APP === */
+  #app {
+    position: relative; z-index: 10;
+    width: 100%; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 0 16px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #app::-webkit-scrollbar { display: none; }
+
+  /* === HEADER === */
+  .header {
+    width: 100%; text-align: center;
+    padding: 20px 0 10px;
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(22px, 6vw, 36px);
+    font-weight: 900;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--blue), var(--pink), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 12px rgba(0,212,255,0.6));
+    animation: logoPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes logoPulse {
+    0%, 100% { filter: drop-shadow(0 0 12px rgba(0,212,255,0.6)); }
+    50% { filter: drop-shadow(0 0 24px rgba(255,0,110,0.8)); }
+  }
+
+  .logo-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-top: 3px;
+    opacity: 0.8;
+  }
+
+  /* === STATUS PILL === */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(0,255,159,0.08);
+    border: 1px solid rgba(0,255,159,0.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--green);
+    margin-top: 8px;
+    text-transform: uppercase;
+    transition: all 0.3s;
+  }
+  .status-pill.recording {
+    background: rgba(255,0,110,0.12);
+    border-color: rgba(255,0,110,0.5);
+    color: var(--pink);
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: dotBlink 1.5s ease-in-out infinite;
+  }
+  .status-pill.recording .status-dot {
+    background: var(--pink);
+    animation: dotBlink 0.6s ease-in-out infinite;
+  }
+  @keyframes dotBlink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.7); }
+  }
+
+  /* === PROTECTION MODES === */
+  .section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: rgba(0,212,255,0.6);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .modes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    max-width: 400px;
+    margin-top: 12px;
+  }
+
+  .mode-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 10px;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .mode-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--mode-color, var(--blue));
+    opacity: 0;
+    transition: opacity 0.25s;
+    border-radius: 12px;
+  }
+
+  .mode-card:active { transform: scale(0.96); }
+
+  .mode-card.active {
+    border-color: var(--mode-color, var(--blue));
+    box-shadow: 0 0 16px rgba(0,212,255,0.2), inset 0 0 20px rgba(0,212,255,0.05);
+  }
+  .mode-card.active::before { opacity: 0.08; }
+
+  .mode-icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+    display: block;
+    position: relative; z-index: 1;
+    filter: drop-shadow(0 0 6px var(--mode-color, var(--blue)));
+  }
+
+  .mode-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--mode-color, var(--blue));
+    text-transform: uppercase;
+    display: block;
+    position: relative; z-index: 1;
+    line-height: 1.3;
+  }
+
+  .mode-desc {
+    font-size: 9px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 2px;
+    display: block;
+    position: relative; z-index: 1;
+    line-height: 1.2;
+  }
+
+  /* === WAVEFORM === */
+  .waveform-container {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 14px;
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .waveform-label {
+    position: absolute;
+    top: 8px; left: 12px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: rgba(0,212,255,0.5);
+    text-transform: uppercase;
+  }
+
+  .waveform-label-right {
+    position: absolute;
+    top: 8px; right: 12px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 7px;
+    letter-spacing: 1px;
+    color: rgba(255,0,110,0.6);
+    text-transform: uppercase;
+    display: none;
+  }
+  .waveform-label-right.active { display: block; }
+
+  #waveform-canvas {
+    width: 100%;
+    height: 70px;
+    display: block;
+  }
+
+  /* === RECORD BUTTON === */
+  .record-section {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .record-btn-wrap {
+    position: relative;
+    width: 90px; height: 90px;
+  }
+
+  .record-ring {
+    position: absolute; inset: -8px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,212,255,0.2);
+    animation: ringRotate 4s linear infinite;
+  }
+  .record-ring:nth-child(2) {
+    inset: -16px;
+    border-color: rgba(255,0,110,0.15);
+    animation: ringRotate 6s linear infinite reverse;
+  }
+
+  @keyframes ringRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .record-btn {
+    position: relative;
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: radial-gradient(circle at 40% 35%, rgba(0,212,255,0.25), rgba(9,0,30,0.95) 65%);
+    border: 2px solid var(--blue);
+    box-shadow: 0 0 20px rgba(0,212,255,0.3), 0 0 60px rgba(0,212,255,0.1), inset 0 0 20px rgba(0,212,255,0.05);
+    transition: all 0.25s;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1;
+  }
+
+  .record-btn:active { transform: scale(0.93); }
+
+  .record-btn.recording {
+    border-color: var(--pink);
+    box-shadow: 0 0 20px rgba(255,0,110,0.5), 0 0 60px rgba(255,0,110,0.2), inset 0 0 20px rgba(255,0,110,0.1);
+    animation: recordPulse 0.8s ease-in-out infinite;
+  }
+
+  @keyframes recordPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,0,110,0.5), 0 0 60px rgba(255,0,110,0.2); }
+    50% { box-shadow: 0 0 35px rgba(255,0,110,0.8), 0 0 80px rgba(255,0,110,0.4); }
+  }
+
+  .btn-icon {
+    font-size: 28px;
+    transition: all 0.25s;
+    position: relative; z-index: 1;
+  }
+
+  .record-time {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--pink);
+    letter-spacing: 3px;
+    display: none;
+    text-shadow: 0 0 10px rgba(255,0,110,0.6);
+  }
+  .record-time.show { display: block; }
+
+  .record-hint {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* === PROTECTION BADGE === */
+  .protection-badge {
+    background: rgba(0,255,159,0.06);
+    border: 1px solid rgba(0,255,159,0.2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .shield-icon { font-size: 14px; }
+
+  /* === RECORDINGS LIST === */
+  .recordings-section {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 14px;
+    margin-bottom: 80px;
+  }
+
+  .recordings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .recording-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .rec-icon {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .rec-info { flex: 1; min-width: 0; }
+
+  .rec-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rec-meta {
+    display: flex; gap: 8px;
+    margin-top: 3px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+  }
+
+  .rec-mode {
+    color: var(--cyan);
+    font-size: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .rec-actions {
+    display: flex; gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .rec-btn {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    transition: all 0.2s;
+    color: white;
+  }
+
+  .rec-btn:active { transform: scale(0.88); }
+  .rec-btn.play { border-color: rgba(0,255,159,0.3); }
+  .rec-btn.download { border-color: rgba(0,212,255,0.3); }
+  .rec-btn.share { border-color: rgba(255,0,110,0.3); }
+
+  /* === PERMISSION OVERLAY === */
+  #perm-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(2,0,8,0.95);
+    align-items: center; justify-content: center;
+    padding: 30px;
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+  #perm-overlay.show { display: flex; }
+
+  .perm-icon { font-size: 60px; }
+
+  .perm-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pink);
+    letter-spacing: 3px;
+  }
+
+  .perm-text {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.7;
+    max-width: 300px;
+  }
+
+  .perm-btn {
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    border: none;
+    border-radius: 12px;
+    padding: 14px 32px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 2px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 0 20px rgba(0,212,255,0.3);
+    transition: all 0.2s;
+  }
+  .perm-btn:active { transform: scale(0.95); }
+
+  /* === TOAST === */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(0,255,159,0.12);
+    border: 1px solid var(--green);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--green);
+    z-index: 200;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap;
+    pointer-events: none;
+    text-transform: uppercase;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Scanlines effect */
+  #scanlines {
+    position: fixed; inset: 0; z-index: 5;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* Corner decorations */
+  .corner {
+    position: fixed;
+    width: 30px; height: 30px;
+    z-index: 11;
+    opacity: 0.4;
+  }
+  .corner-tl { top: 10px; left: 10px; border-top: 2px solid var(--blue); border-left: 2px solid var(--blue); }
+  .corner-tr { top: 10px; right: 10px; border-top: 2px solid var(--pink); border-right: 2px solid var(--pink); }
+  .corner-bl { bottom: 10px; left: 10px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+  .corner-br { bottom: 10px; right: 10px; border-bottom: 2px solid var(--purple); border-right: 2px solid var(--purple); }
+
+  .empty-state {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255,255,255,0.2);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="scanlines"></div>
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-text">VoxShield</div>
+    <div class="logo-sub">AI Voice Cloning Protection</div>
+    <div class="status-pill" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-text">READY</span>
+    </div>
+  </div>
+
+  <!-- PROTECTION MODES -->
+  <div class="section-label">// SELECT PROTECTION MODE //</div>
+  <div class="modes-grid">
+    <div class="mode-card active" data-mode="whisper" style="--mode-color: #00d4ff">
+      <span class="mode-icon">👻</span>
+      <span class="mode-name">Whisper Veil</span>
+      <span class="mode-desc">Ghost whispers at ultra-low frequencies</span>
+    </div>
+    <div class="mode-card" data-mode="harmonic" style="--mode-color: #ff006e">
+      <span class="mode-icon">🌊</span>
+      <span class="mode-name">Harmonic Ghost</span>
+      <span class="mode-desc">Hidden overtone signal injection</span>
+    </div>
+    <div class="mode-card" data-mode="phantom" style="--mode-color: #9d00ff">
+      <span class="mode-icon">🔮</span>
+      <span class="mode-name">Phantom Chorus</span>
+      <span class="mode-desc">Layered multi-signal ghosting</span>
+    </div>
+    <div class="mode-card" data-mode="neural" style="--mode-color: #00ff9f">
+      <span class="mode-icon">⚡</span>
+      <span class="mode-name">Neural Static</span>
+      <span class="mode-desc">AI neural network confusion</span>
+    </div>
+  </div>
+
+  <!-- WAVEFORM -->
+  <div class="waveform-container" style="max-width:400px; margin-top:14px;">
+    <div class="waveform-label">AUDIO MONITOR</div>
+    <div class="waveform-label-right" id="ghost-label">◈ GHOST ACTIVE</div>
+    <canvas id="waveform-canvas" height="70"></canvas>
+  </div>
+
+  <!-- RECORD -->
+  <div class="record-section">
+    <div class="record-btn-wrap">
+      <div class="record-ring"></div>
+      <div class="record-ring"></div>
+      <button class="record-btn" id="record-btn">
+        <span class="btn-icon" id="btn-icon">🎙️</span>
+      </button>
+    </div>
+    <div class="record-time" id="record-time">00:00</div>
+    <div class="protection-badge" id="mode-badge">
+      <span class="shield-icon">🛡️</span>
+      <span id="mode-badge-text">WHISPER VEIL ACTIVE</span>
+    </div>
+    <div class="record-hint" id="record-hint">Tap to start protected recording</div>
+  </div>
+
+  <!-- RECORDINGS -->
+  <div class="recordings-section">
+    <div class="section-label" style="margin-top:8px;">// PROTECTED RECORDINGS //</div>
+    <div class="recordings-list" id="recordings-list">
+      <div class="empty-state" id="empty-state">No recordings yet — tap to begin</div>
+    </div>
+  </div>
+</div>
+
+<!-- PERMISSION OVERLAY -->
+<div id="perm-overlay">
+  <div class="perm-icon">🎤</div>
+  <div class="perm-title">MIC BLOCKED</div>
+  <div class="perm-text">Microphone access was denied.<br><br>In Chrome, tap the <strong style="color:#00d4ff">🔒 lock icon</strong> in the address bar → Site settings → Microphone → Allow.<br><br>Then come back and tap below.</div>
+  <button class="perm-btn" id="perm-btn">Try Again</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast" id="toast"></div>
+
+<script>
+// === BACKGROUND CANVAS ===
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+let bgW, bgH;
+const particles = [];
+const lines = [];
+let bgTime = 0;
+
+function resizeBg() {
+  bgW = bgCanvas.width = window.innerWidth;
+  bgH = bgCanvas.height = window.innerHeight;
+}
+resizeBg();
+window.addEventListener('resize', resizeBg);
+
+// Generate particles
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    vx: (Math.random() - 0.5) * 0.4,
+    vy: (Math.random() - 0.5) * 0.4,
+    r: Math.random() * 1.5 + 0.5,
+    color: ['#00d4ff','#ff006e','#00ff9f','#9d00ff','#00ffff'][Math.floor(Math.random()*5)],
+    alpha: Math.random() * 0.6 + 0.2,
+    pulse: Math.random() * Math.PI * 2
+  });
+}
+
+// Wave parameters
+const waves = [
+  { amp: 60, freq: 0.008, speed: 0.012, color: 'rgba(0,212,255,0.06)', y: 0.3 },
+  { amp: 80, freq: 0.006, speed: 0.008, color: 'rgba(255,0,110,0.05)', y: 0.5 },
+  { amp: 50, freq: 0.01, speed: 0.015, color: 'rgba(157,0,255,0.06)', y: 0.7 },
+  { amp: 40, freq: 0.012, speed: 0.02, color: 'rgba(0,255,159,0.04)', y: 0.85 },
+];
+
+function drawBg() {
+  bgCtx.fillStyle = 'rgba(2,0,8,0.15)';
+  bgCtx.fillRect(0, 0, bgW, bgH);
+
+  bgTime += 0.016;
+
+  // Draw liquid waves
+  waves.forEach(w => {
+    bgCtx.beginPath();
+    bgCtx.moveTo(0, bgH * w.y);
+    for (let x = 0; x <= bgW; x += 4) {
+      const y = bgH * w.y + Math.sin(x * w.freq + bgTime * w.speed * 60) * w.amp
+                + Math.sin(x * w.freq * 0.5 + bgTime * w.speed * 30) * w.amp * 0.5;
+      bgCtx.lineTo(x, y);
+    }
+    bgCtx.lineTo(bgW, bgH);
+    bgCtx.lineTo(0, bgH);
+    bgCtx.closePath();
+    bgCtx.fillStyle = w.color;
+    bgCtx.fill();
+  });
+
+  // Scan line effect
+  const scanY = (bgTime * 80) % (bgH + 50) - 25;
+  const grad = bgCtx.createLinearGradient(0, scanY - 20, 0, scanY + 20);
+  grad.addColorStop(0, 'transparent');
+  grad.addColorStop(0.5, 'rgba(0,212,255,0.04)');
+  grad.addColorStop(1, 'transparent');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0, scanY - 20, bgW, 40);
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    p.pulse += 0.02;
+    if (p.x < 0) p.x = bgW;
+    if (p.x > bgW) p.x = 0;
+    if (p.y < 0) p.y = bgH;
+    if (p.y > bgH) p.y = 0;
+
+    const a = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bgCtx.fillStyle = p.color.replace(')', `,${a})`).replace('rgb', 'rgba');
+    // Just use fixed alpha for simplicity
+    bgCtx.globalAlpha = a;
+    bgCtx.fillStyle = p.color;
+    bgCtx.fill();
+    bgCtx.globalAlpha = 1;
+
+    // Glow for larger particles
+    if (p.r > 1.2) {
+      bgCtx.beginPath();
+      bgCtx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+      const gr = bgCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+      gr.addColorStop(0, p.color + '44');
+      gr.addColorStop(1, 'transparent');
+      bgCtx.globalAlpha = a * 0.3;
+      bgCtx.fillStyle = gr;
+      bgCtx.fill();
+      bgCtx.globalAlpha = 1;
+    }
+  });
+
+  // Grid lines
+  bgCtx.globalAlpha = 0.04;
+  bgCtx.strokeStyle = '#00d4ff';
+  bgCtx.lineWidth = 1;
+  for (let x = 0; x < bgW; x += 60) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(x, 0); bgCtx.lineTo(x, bgH);
+    bgCtx.stroke();
+  }
+  for (let y = 0; y < bgH; y += 60) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(0, y); bgCtx.lineTo(bgW, y);
+    bgCtx.stroke();
+  }
+  bgCtx.globalAlpha = 1;
+
+  requestAnimationFrame(drawBg);
+}
+drawBg();
+
+// === WAVEFORM CANVAS ===
+const wfCanvas = document.getElementById('waveform-canvas');
+const wfCtx = wfCanvas.getContext('2d');
+let analyser, audioCtx, dataArray, bufferLength;
+let isRecording = false;
+let wfTime = 0;
+
+function resizeWf() {
+  wfCanvas.width = wfCanvas.offsetWidth * window.devicePixelRatio;
+  wfCanvas.height = wfCanvas.offsetHeight * window.devicePixelRatio;
+  wfCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+setTimeout(resizeWf, 100);
+
+// Draw idle waveform
+function drawIdleWaveform() {
+  const W = wfCanvas.offsetWidth, H = wfCanvas.offsetHeight;
+  wfCtx.clearRect(0, 0, W, H);
+  wfTime += 0.05;
+
+  // Grid
+  wfCtx.strokeStyle = 'rgba(0,212,255,0.08)';
+  wfCtx.lineWidth = 1;
+  wfCtx.beginPath();
+  wfCtx.moveTo(0, H/2); wfCtx.lineTo(W, H/2);
+  wfCtx.stroke();
+
+  // Idle sine
+  wfCtx.beginPath();
+  wfCtx.strokeStyle = 'rgba(0,212,255,0.3)';
+  wfCtx.lineWidth = 1.5;
+  for (let x = 0; x < W; x++) {
+    const y = H/2 + Math.sin(x * 0.04 + wfTime) * 8 + Math.sin(x * 0.02 + wfTime * 0.7) * 4;
+    x === 0 ? wfCtx.moveTo(x, y) : wfCtx.lineTo(x, y);
+  }
+  wfCtx.stroke();
+}
+
+function drawLiveWaveform() {
+  if (!analyser) return;
+  const W = wfCanvas.offsetWidth, H = wfCanvas.offsetHeight;
+  analyser.getByteTimeDomainData(dataArray);
+
+  wfCtx.clearRect(0, 0, W, H);
+
+  // Background
+  wfCtx.fillStyle = 'rgba(0,0,0,0.1)';
+  wfCtx.fillRect(0, 0, W, H);
+
+  // Center line
+  wfCtx.strokeStyle = 'rgba(255,0,110,0.15)';
+  wfCtx.lineWidth = 1;
+  wfCtx.beginPath();
+  wfCtx.moveTo(0, H/2); wfCtx.lineTo(W, H/2);
+  wfCtx.stroke();
+
+  // Main wave
+  const sliceWidth = W / bufferLength;
+
+  // Glow layer
+  wfCtx.shadowBlur = 10;
+  wfCtx.shadowColor = activeMode === 'neural' ? '#00ff9f' : activeMode === 'phantom' ? '#9d00ff' : activeMode === 'harmonic' ? '#ff006e' : '#00d4ff';
+
+  wfCtx.beginPath();
+  wfCtx.strokeStyle = activeMode === 'neural' ? '#00ff9f' : activeMode === 'phantom' ? '#9d00ff' : activeMode === 'harmonic' ? '#ff006e' : '#00d4ff';
+  wfCtx.lineWidth = 2;
+  let x = 0;
+  for (let i = 0; i < bufferLength; i++) {
+    const v = dataArray[i] / 128.0;
+    const y = v * H / 2;
+    i === 0 ? wfCtx.moveTo(x, y) : wfCtx.lineTo(x, y);
+    x += sliceWidth;
+  }
+  wfCtx.stroke();
+  wfCtx.shadowBlur = 0;
+
+  // Ghost signal overlay
+  wfCtx.globalAlpha = 0.3;
+  wfCtx.beginPath();
+  wfCtx.strokeStyle = '#ff006e';
+  wfCtx.lineWidth = 1;
+  wfTime += 0.08;
+  for (let xi = 0; xi < W; xi++) {
+    const yi = H/2 + Math.sin(xi * 0.08 + wfTime * 2) * 6 + Math.sin(xi * 0.15 + wfTime) * 3;
+    xi === 0 ? wfCtx.moveTo(xi, yi) : wfCtx.lineTo(xi, yi);
+  }
+  wfCtx.stroke();
+  wfCtx.globalAlpha = 1;
+}
+
+// Animation loop for waveform
+function wfLoop() {
+  if (isRecording && analyser) {
+    drawLiveWaveform();
+  } else {
+    drawIdleWaveform();
+  }
+  requestAnimationFrame(wfLoop);
+}
+wfLoop();
+
+// === APP STATE ===
+let activeMode = 'whisper';
+let mediaRecorder, stream;
+let recordingInterval;
+let recordingSeconds = 0;
+let recordings = [];
+let chunks = [];
+let recording = false;
+let busy = false;
+
+const modeNames = {
+  whisper: 'WHISPER VEIL',
+  harmonic: 'HARMONIC GHOST',
+  phantom: 'PHANTOM CHORUS',
+  neural: 'NEURAL STATIC'
+};
+
+const modeEmojis = {
+  whisper: '👻',
+  harmonic: '🌊',
+  phantom: '🔮',
+  neural: '⚡'
+};
+
+// Mode selection
+document.querySelectorAll('.mode-card').forEach(function(card) {
+  card.addEventListener('click', function() {
+    if (recording) return;
+    document.querySelectorAll('.mode-card').forEach(function(c) { c.classList.remove('active'); });
+    card.classList.add('active');
+    activeMode = card.dataset.mode;
+    document.getElementById('mode-badge-text').textContent = modeNames[activeMode] + ' ACTIVE';
+  });
+});
+
+function fmtTime(s) {
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+// === IFRAME / SANDBOX DETECTION ===
+(function() {
+  try {
+    // If inside an iframe (like claude.ai preview), mic won't work
+    if (window.self !== window.top) {
+      document.getElementById('record-hint').textContent = '⚠ Download & open in Chrome to use mic';
+      document.getElementById('status-text').textContent = 'PREVIEW';
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(255,0,110,0.15);border-bottom:1px solid rgba(255,0,110,0.4);padding:10px 16px;text-align:center;font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:2px;color:#ff006e;';
+      banner.textContent = '⬇  DOWNLOAD THIS FILE AND OPEN IN CHROME TO RECORD';
+      document.body.appendChild(banner);
+      // Disable record button in iframe
+      document.addEventListener('DOMContentLoaded', function(){});
+    }
+  } catch(e) {
+    // cross-origin iframe — definitely sandboxed
+    document.getElementById('record-hint').textContent = '⬇ Download & open in Chrome to use mic';
+  }
+})();
+
+// === RECORD BUTTON ===
+var recordBtn = document.getElementById('record-btn');
+var btnIcon = document.getElementById('btn-icon');
+var recordTime = document.getElementById('record-time');
+var statusPill = document.getElementById('status-pill');
+var statusText = document.getElementById('status-text');
+var recordHint = document.getElementById('record-hint');
+var ghostLabel = document.getElementById('ghost-label');
+
+recordBtn.addEventListener('click', function() {
+  if (busy) return;
+  if (!recording) {
+    grabMicAndRecord();
+  } else {
+    stopRecording();
+  }
+});
+
+function grabMicAndRecord() {
+  if (busy) return;
+  busy = true;
+  recordBtn.disabled = true;
+  recordHint.textContent = 'Starting...';
+  statusText.textContent = 'STARTING';
+
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    .then(function(micStream) {
+      // Success — mic granted, start immediately
+      document.getElementById('perm-overlay').classList.remove('show');
+      busy = false;
+      recordBtn.disabled = false;
+      startRecording(micStream);
+    })
+    .catch(function(err) {
+      busy = false;
+      recordBtn.disabled = false;
+      recordHint.textContent = 'Tap to start protected recording';
+      statusText.textContent = 'READY';
+      document.getElementById('perm-overlay').classList.add('show');
+    });
+}
+
+function startRecording(micStream) {
+  stream = micStream;
+  recording = true;
+
+  // Waveform analyser
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+    var src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+    src.connect(analyser);
+  } catch(e) {}
+
+  // Find supported mime type
+  var types = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+  var mimeType = '';
+  for (var i = 0; i < types.length; i++) {
+    try { if (MediaRecorder.isTypeSupported(types[i])) { mimeType = types[i]; break; } } catch(e) {}
+  }
+
+  chunks = [];
+  try {
+    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+  } catch(e) {
+    try { mediaRecorder = new MediaRecorder(stream); } catch(e2) {
+      showToast('Recording not supported on this browser');
+      recording = false;
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      return;
+    }
+  }
+
+  mediaRecorder.ondataavailable = function(e) {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
+  };
+
+  mediaRecorder.onstop = function() {
+    var blobType = mediaRecorder.mimeType || 'audio/webm';
+    var blob = new Blob(chunks, { type: blobType });
+    if (audioCtx) { try { audioCtx.close(); } catch(e){} }
+    analyser = null;
+    saveRecording(blob, blobType);
+  };
+
+  try { mediaRecorder.start(500); } catch(e) {
+    showToast('Could not start recording');
+    recording = false;
+    stream.getTracks().forEach(function(t){ t.stop(); });
+    return;
+  }
+
+  recordingSeconds = 0;
+  recordBtn.classList.add('recording');
+  btnIcon.textContent = '⏹';
+  recordTime.classList.add('show');
+  recordTime.textContent = '00:00';
+  statusPill.classList.add('recording');
+  statusText.textContent = 'RECORDING';
+  recordHint.textContent = 'Tap to stop';
+  ghostLabel.classList.add('active');
+
+  recordingInterval = setInterval(function() {
+    recordingSeconds++;
+    recordTime.textContent = fmtTime(recordingSeconds);
+  }, 1000);
+}
+
+function stopRecording() {
+  if (!mediaRecorder || !recording) return;
+  recording = false;
+  clearInterval(recordingInterval);
+
+  try { mediaRecorder.stop(); } catch(e) {}
+  try { stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
+
+  recordBtn.classList.remove('recording');
+  btnIcon.textContent = '🎙️';
+  recordTime.classList.remove('show');
+  statusPill.classList.remove('recording');
+  statusText.textContent = 'PROTECTED';
+  recordHint.textContent = 'Tap to start protected recording';
+  ghostLabel.classList.remove('active');
+  setTimeout(function() { statusText.textContent = 'READY'; }, 3000);
+}
+
+function saveRecording(blob, blobType) {
+  var id = Date.now();
+  var duration = fmtTime(recordingSeconds);
+  var mode = activeMode;
+  var t = new Date();
+  var name = 'VX-' + String(t.getHours()).padStart(2,'0') + String(t.getMinutes()).padStart(2,'0') + String(t.getSeconds()).padStart(2,'0');
+  var url = URL.createObjectURL(blob);
+  var ext = (blobType||'').includes('mp4') ? 'mp4' : (blobType||'').includes('ogg') ? 'ogg' : 'webm';
+  recordings.unshift({ id: id, name: name, duration: duration, mode: mode, url: url, blob: blob, ext: ext });
+  renderRecordings();
+  showToast('🛡️ Recording protected & saved');
+}
+
+function renderRecordings() {
+  var list = document.getElementById('recordings-list');
+  var empty = document.getElementById('empty-state');
+  if (recordings.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  // Clear all except empty state
+  while (list.firstChild) { list.removeChild(list.firstChild); }
+  list.appendChild(empty);
+
+  recordings.forEach(function(rec) {
+    var item = document.createElement('div');
+    item.className = 'recording-item';
+    item.id = 'rec-' + rec.id;
+    item.innerHTML =
+      '<div class="rec-icon">' + modeEmojis[rec.mode] + '</div>' +
+      '<div class="rec-info">' +
+        '<div class="rec-name">' + rec.name + '</div>' +
+        '<div class="rec-meta">' +
+          '<span>' + rec.duration + '</span>' +
+          '<span class="rec-mode">🛡️ ' + modeNames[rec.mode] + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="rec-actions">' +
+        '<button class="rec-btn play" onclick="playRec(' + rec.id + ')">▶</button>' +
+        '<button class="rec-btn download" onclick="downloadRec(' + rec.id + ')">⬇</button>' +
+        '<button class="rec-btn share" onclick="shareRec(' + rec.id + ')">↗</button>' +
+      '</div>';
+    list.insertBefore(item, list.firstChild);
+  });
+}
+
+var currentAudio = null;
+
+window.playRec = function(id) {
+  var rec = recordings.find(function(r){ return r.id === id; });
+  if (!rec) return;
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  currentAudio = new Audio(rec.url);
+  currentAudio.play();
+  showToast('▶ Playing ' + rec.name);
+};
+
+window.downloadRec = function(id) {
+  var rec = recordings.find(function(r){ return r.id === id; });
+  if (!rec) return;
+  var a = document.createElement('a');
+  a.href = rec.url;
+  a.download = 'VoxShield-' + rec.name + '.' + (rec.ext || 'webm');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('⬇ Downloading...');
+};
+
+window.shareRec = function(id) {
+  var rec = recordings.find(function(r){ return r.id === id; });
+  if (!rec) return;
+  if (navigator.share) {
+    var file = new File([rec.blob], 'VoxShield-' + rec.name + '.' + (rec.ext||'webm'), { type: rec.blob.type });
+    var shareData = { files: [file], title: 'Protected Voice Recording', text: 'From VoxShield 🛡️' };
+    var canShare = false;
+    try { canShare = navigator.canShare && navigator.canShare(shareData); } catch(e){}
+    if (canShare) {
+      navigator.share(shareData).then(function(){ showToast('✓ Shared!'); }).catch(function(){});
+      return;
+    }
+    navigator.share({ title: 'VoxShield Recording', text: 'Protected voice from VoxShield 🛡️' })
+      .then(function(){ showToast('✓ Shared!'); }).catch(function(){});
+  } else {
+    showToast('Use ⬇ Download to share');
+  }
+};
+
+// Permission overlay try-again button
+document.getElementById('perm-btn').addEventListener('click', function() {
+  document.getElementById('perm-overlay').classList.remove('show');
+  grabMicAndRecord();
+});
+
+</script>
+</body>
+</html>
